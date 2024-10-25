@@ -118,60 +118,6 @@ func udpSocksLocal(laddr, server string, shadow func(net.PacketConn) net.PacketC
 	}
 }
 
-// Listen on addr for encrypted packets and basically do UDP NAT.
-func udpRemote(addr string, shadow func(net.PacketConn) net.PacketConn) {
-	c, err := net.ListenPacket("udp", addr)
-	if err != nil {
-		logf("UDP remote listen error: %v", err)
-		return
-	}
-	defer c.Close()
-	c = shadow(c)
-
-	nm := newNATmap(config.UDPTimeout)
-	buf := make([]byte, udpBufSize)
-
-	logf("listening UDP on %s", addr)
-	for {
-		n, raddr, err := c.ReadFrom(buf)
-		if err != nil {
-			logf("UDP remote read error: %v", err)
-			continue
-		}
-
-		tgtAddr := socks.SplitAddr(buf[:n])
-		if tgtAddr == nil {
-			logf("failed to split target address from packet: %q", buf[:n])
-			continue
-		}
-
-		tgtUDPAddr, err := net.ResolveUDPAddr("udp", tgtAddr.String())
-		if err != nil {
-			logf("failed to resolve target UDP address: %v", err)
-			continue
-		}
-
-		payload := buf[len(tgtAddr):n]
-
-		pc := nm.Get(raddr.String())
-		if pc == nil {
-			pc, err = net.ListenPacket("udp", "")
-			if err != nil {
-				logf("UDP remote listen error: %v", err)
-				continue
-			}
-
-			nm.Add(raddr, c, pc, remoteServer)
-		}
-
-		_, err = pc.WriteTo(payload, tgtUDPAddr) // accept only UDPAddr despite the signature
-		if err != nil {
-			logf("UDP remote write error: %v", err)
-			continue
-		}
-	}
-}
-
 // Packet NAT table
 type natmap struct {
 	sync.RWMutex

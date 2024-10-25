@@ -1,0 +1,11 @@
+
+services:
+  go-shadowsocks2:
+    container_name: go-shadowsocks2
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8488:8488
+      - 8488:8488/udp
+    command: ["-s", "ss://AEAD_CHACHA20_POLY1305:password@:8488", "-verbose"]
